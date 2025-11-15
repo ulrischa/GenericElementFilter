@@ -1,4 +1,5 @@
 # GenericElementFilter
+![AISelect_20251115_132800_Google](https://github.com/user-attachments/assets/28767228-c47f-4672-b594-191a6fe1e2d9)
 
 A small, framework-agnostic helper to filter any kind of elements (cards, table rows, list items, …) based on form controls (`<select>`, radios, etc.) and matching `data-*` attributes.
 
