@@ -23,11 +23,11 @@ class GenericElementFilter {
    *   @param {string} [options.allValue="all"] - Value that indicates "no filter" / "show all"
    *   @param {string} [options.viewTransitionPrefix] - Optional prefix for view transition names
    *   @param {function} [options.statusFormatter] - (count) => string for status text
+   *   @param {"equals"|"contains"} [options.matchMode="equals"] - How to compare values
+   *   @param {function} [options.onBeforeFilter] - Hook called before filtering
+   *   @param {function} [options.onAfterFilter] - Hook called after filtering
    */
-  constructor(
-    elementsSelector,
-    options = {}
-  ) {
+  constructor(elementsSelector, options = {}) {
     if (!elementsSelector) {
       throw new Error(
         "GenericElementFilter: elementsSelector is required as first argument."
@@ -42,6 +42,9 @@ class GenericElementFilter {
       allValue = "all",
       viewTransitionPrefix,
       statusFormatter,
+      matchMode = "equals",
+      onBeforeFilter,
+      onAfterFilter,
     } = options;
 
     // Remember the original selector so we can refresh dynamically later
@@ -69,6 +72,15 @@ class GenericElementFilter {
       typeof statusFormatter === "function"
         ? statusFormatter
         : (count) => `${count} results found`;
+
+    // Match mode: "equals" (default) or "contains"
+    this.matchMode = matchMode === "contains" ? "contains" : "equals";
+
+    // Optional hooks
+    this.onBeforeFilter =
+      typeof onBeforeFilter === "function" ? onBeforeFilter : null;
+    this.onAfterFilter =
+      typeof onAfterFilter === "function" ? onAfterFilter : null;
 
     // Holds the currently active filter values, keyed by filter name
     // Example: { season: "all", edible: "all" }
@@ -230,10 +242,24 @@ class GenericElementFilter {
    * Core filtering logic.
    * Shows/hides elements based on currentFilters and updates
    * "no results" and optional status text.
+   *
+   * Supports:
+   *  - matchMode: "equals" (default) or "contains"
+   *    - "contains" splits data-* value on comma or whitespace and checks tokens.
+   *  - optional hooks: onBeforeFilter, onAfterFilter
    */
   filterElements() {
     let hasVisibleElements = false;
     let visibleCount = 0;
+    const totalCount = this.elements.length;
+
+    // Hook: before filtering
+    if (this.onBeforeFilter) {
+      this.onBeforeFilter({
+        currentFilters: { ...this.currentFilters },
+        elements: this.elements.slice(),
+      });
+    }
 
     this.elements.forEach((element) => {
       const matchesAllFilters = Object.entries(this.currentFilters).every(
@@ -250,6 +276,23 @@ class GenericElementFilter {
           // we ignore this filter for this element.
           if (typeof elementValue === "undefined") return true;
 
+          if (this.matchMode === "contains") {
+            const hayRaw = elementValue.trim();
+            if (!hayRaw) return false;
+
+            // Support comma- or whitespace-separated tokens
+            const parts =
+              hayRaw.indexOf(",") !== -1
+                ? hayRaw.split(",")
+                : hayRaw.split(/\s+/);
+
+            return parts
+              .map((p) => p.trim())
+              .filter(Boolean)
+              .some((p) => p === filterValue);
+          }
+
+          // Default: strict equality
           return elementValue === filterValue;
         }
       );
@@ -271,6 +314,16 @@ class GenericElementFilter {
     // Update the optional status line with the number of visible elements
     if (this.statusElement) {
       this.statusElement.textContent = this.statusFormatter(visibleCount);
+    }
+
+    // Hook: after filtering
+    if (this.onAfterFilter) {
+      this.onAfterFilter({
+        currentFilters: { ...this.currentFilters },
+        visibleCount,
+        totalCount,
+        elements: this.elements.slice(),
+      });
     }
   }
 
@@ -295,6 +348,51 @@ class GenericElementFilter {
    */
   refreshElements() {
     this._initializeElements(this.elementsSelector);
+    this.filterElements();
+  }
+
+  /**
+   * Reset helper:
+   * - Resets all controls to "allValue" if possible, or to their first option.
+   * - Updates currentFilters accordingly.
+   * - Re-applies filtering.
+   */
+  reset() {
+    if (!this.filters || this.filters.length === 0) return;
+
+    this.filters.forEach((filter) => {
+      const name = filter.name;
+      if (!name) return;
+
+      if (filter instanceof HTMLSelectElement) {
+        const options = Array.from(filter.options || []);
+        const hasAllOption = options.some(
+          (opt) => opt.value === this.allValue
+        );
+
+        if (hasAllOption) {
+          filter.value = this.allValue;
+        } else if (options.length > 0) {
+          filter.selectedIndex = 0;
+        }
+
+        this.currentFilters[name] = filter.value ?? this.allValue;
+      } else if (filter instanceof HTMLInputElement) {
+        // Basic support for text inputs or checkboxes/radios:
+        if (filter.type === "checkbox" || filter.type === "radio") {
+          // Clear selection; treat "no selection" as "all" logically.
+          filter.checked = false;
+          this.currentFilters[name] = this.allValue;
+        } else {
+          filter.value = "";
+          this.currentFilters[name] = this.allValue;
+        }
+      } else {
+        // Fallback: just restore to allValue for this filter key
+        this.currentFilters[name] = this.allValue;
+      }
+    });
+
     this.filterElements();
   }
 
