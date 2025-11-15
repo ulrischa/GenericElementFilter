@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>GenericElementFilter – Edge Case Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.5;
+      }
+
+      body {
+        margin: 0;
+        padding: 2rem;
+        background: #020617;
+        color: #e5e7eb;
+      }
+
+      h1,
+      h2,
+      h3 {
+        color: #fbbf24;
+      }
+
+      a {
+        color: #38bdf8;
+      }
+
+      section {
+        margin-bottom: 3rem;
+        padding: 1.5rem;
+        border-radius: 0.75rem;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+      }
+
+      section + section {
+        margin-top: 2rem;
+      }
+
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .small {
+        font-size: 0.85rem;
+        color: #9ca3af;
+      }
+
+      .filters-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+
+      select,
+      button,
+      input[type="text"] {
+        font: inherit;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.375rem;
+        border: 1px solid #6b7280;
+        background: #020617;
+        color: #e5e7eb;
+      }
+
+      button {
+        cursor: pointer;
+        border-color: #facc15;
+      }
+
+      button:hover {
+        background: #facc15;
+        color: #111827;
+      }
+
+      .cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+      }
+
+      .card {
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        background: #020617;
+      }
+
+      .card h3 {
+        margin-top: 0;
+        margin-bottom: 0.25rem;
+        font-size: 1rem;
+      }
+
+      .card p {
+        margin: 0;
+        font-size: 0.9rem;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.75rem;
+        font-size: 0.9rem;
+        background: #020617;
+      }
+
+      th,
+      td {
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        padding: 0.4rem 0.5rem;
+        text-align: left;
+      }
+
+      th {
+        background: rgba(15, 23, 42, 0.9);
+      }
+
+      .status,
+      .no-results-message {
+        margin: 0.25rem 0 0.5rem;
+        font-size: 0.85rem;
+      }
+
+      .status {
+        color: #a5b4fc;
+      }
+
+      .no-results-message {
+        color: #fca5a5;
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        font-size: 0.85rem;
+        background: rgba(15, 23, 42, 0.9);
+        padding: 0.1rem 0.25rem;
+        border-radius: 0.25rem;
+      }
+
+      .hook-log {
+        font-size: 0.8rem;
+        color: #93c5fd;
+        margin-top: 0.5rem;
+        max-height: 4.5rem;
+        overflow: auto;
+        border-radius: 0.375rem;
+        padding: 0.25rem 0.5rem;
+        background: rgba(15, 23, 42, 0.6);
+      }
+    </style>
+  </head>
+  <body>
+    <img src="logo.jpg" alt="" />
+    <h1>GenericElementFilter – Edge Case Demo</h1>
+    <p class="small">
+      This page demonstrates multiple independent <code>GenericElementFilter</code>
+      instances with lots of edge cases: cards, table rows,
+      <code>matchMode="contains"</code>, <code>reset()</code>, hooks,
+      auto-inferred root and <code>bindAll()</code> + <code>data-*</code>
+      configuration.
+    </p>
+
+    <!-- SECTION 1: Basic cards, explicit root, equals mode, status + no-results + reset + edge cases -->
+    <section class="mushroom-guide" data-filter-root>
+      <div class="section-header">
+        <h2>1. Cards (equals mode, explicit root, reset)</h2>
+        <span class="small">
+          Includes cards with missing data-attributes and values not present in
+          the selects.
+        </span>
+      </div>
+
+      <div class="mushroom-filters filters-row">
+        <label>
+          Season
+          <select name="season">
+            <option value="all">All seasons</option>
+            <option value="spring">Spring</option>
+            <option value="summer">Summer</option>
+            <option value="autumn">Autumn</option>
+          </select>
+        </label>
+        <label>
+          Edible
+          <select name="edible">
+            <option value="all">All</option>
+            <option value="yes">Edible</option>
+            <option value="no">Not edible</option>
+          </select>
+        </label>
+        <button type="button" class="filters-reset">
+          Reset filters
+        </button>
+      </div>
+
+      <p class="filter-status status"></p>
+      <p class="no-results-message" hidden>
+        No mushrooms match your selection.
+      </p>
+
+      <div class="card-list cards-grid">
+        <!-- normal cards -->
+        <article
+          class="card"
+          data-season="spring"
+          data-edible="yes"
+        >
+          <h3>Morel</h3>
+          <p>Spring, edible.</p>
+        </article>
+        <article
+          class="card"
+          data-season="summer"
+          data-edible="yes"
+        >
+          <h3>Chanterelle</h3>
+          <p>Summer, edible.</p>
+        </article>
+        <article
+          class="card"
+          data-season="autumn"
+          data-edible="no"
+        >
+          <h3>Amanita muscaria</h3>
+          <p>Autumn, toxic.</p>
+        </article>
+        <article
+          class="card"
+          data-season="autumn"
+          data-edible="yes"
+        >
+          <h3>Porcini</h3>
+          <p>Autumn, edible.</p>
+        </article>
+
+        <!-- edge case: season value not represented in the select -->
+        <article
+          class="card"
+          data-season="winter"
+          data-edible="yes"
+        >
+          <h3>Winter oyster</h3>
+          <p>
+            Season: <code>winter</code> (not in select), edible. Should only ever
+            disappear when other filters exclude it.
+          </p>
+        </article>
+
+        <!-- edge case: missing data-edible (filter should ignore this card for edible filter) -->
+        <article class="card" data-season="spring">
+          <h3>Mystery spring fungus</h3>
+          <p>
+            Has <code>data-season="spring"</code> but no
+            <code>data-edible</code>.
+          </p>
+        </article>
+
+        <!-- edge case: missing data-season (filter should ignore this card for season filter) -->
+        <article class="card" data-edible="no">
+          <h3>Unknown species</h3>
+          <p>
+            Has <code>data-edible="no"</code> but no <code>data-season</code>.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <!-- SECTION 2: Cards with tags, matchMode=contains, auto-inferred root -->
+    <section class="tag-filter" data-filter-root>
+      <div class="section-header">
+        <h2>2. Cards with tags (matchMode = "contains")</h2>
+        <span class="small">
+          Uses <code>data-tag</code> with multiple tokens and
+          <code>matchMode="contains"</code>.
+        </span>
+      </div>
+
+      <div class="filters-row">
+        <label>
+          Tag
+          <select name="tag">
+            <option value="all">All tags</option>
+            <option value="forest">Forest</option>
+            <option value="meadow">Meadow</option>
+            <option value="water">Water</option>
+            <option value="desert">Desert (no hits)</option>
+          </select>
+        </label>
+      </div>
+
+      <p class="tag-status status"></p>
+      <p class="tag-no-results no-results-message" hidden>
+        No tagged cards match.
+      </p>
+
+      <div class="cards-grid">
+        <article class="card" data-tag="forest meadow">
+          <h3>Forest walk</h3>
+          <p>Tags: forest, meadow</p>
+        </article>
+        <article class="card" data-tag=" meadow  ">
+          <h3>Meadow picnic</h3>
+          <p>Tags: meadow (with extra whitespace)</p>
+        </article>
+        <article class="card" data-tag="water, forest">
+          <h3>Riverside trail</h3>
+          <p>Tags: water, forest (comma separated)</p>
+        </article>
+        <!-- edge case: empty data-tag -->
+        <article class="card" data-tag="  ">
+          <h3>Tagless card</h3>
+          <p>Empty data-tag → should only be visible for "All tags".</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- SECTION 3: Table (equals mode, allValue="") -->
+    <section class="city-table" data-filter-root>
+      <div class="section-header">
+        <h2>3. Table rows (equals, allValue="")</h2>
+        <span class="small">
+          Rows with <code>data-country</code> / <code>data-size</code>,
+          rows missing attributes and values not present in the selects.
+        </span>
+      </div>
+
+      <div class="filters-row">
+        <label>
+          Country
+          <select name="country">
+            <option value="">All countries</option>
+            <option value="de">Germany</option>
+            <option value="at">Austria</option>
+          </select>
+        </label>
+        <label>
+          Size
+          <select name="size">
+            <option value="">All sizes</option>
+            <option value="small">Small</option>
+            <option value="big">Big</option>
+            <option value="tiny">Tiny (no hits)</option>
+          </select>
+        </label>
+      </div>
+
+      <p class="city-status status"></p>
+      <p class="city-no-results no-results-message" hidden>
+        No cities match your selection.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>City</th>
+            <th>Country</th>
+            <th>Size</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="city-row" data-country="de" data-size="big">
+            <td>Berlin</td>
+            <td>DE</td>
+            <td>big</td>
+          </tr>
+          <tr class="city-row" data-country="de" data-size="small">
+            <td>Weimar</td>
+            <td>DE</td>
+            <td>small</td>
+          </tr>
+          <tr class="city-row" data-country="at" data-size="small">
+            <td>Graz</td>
+            <td>AT</td>
+            <td>small</td>
+          </tr>
+          <tr class="city-row" data-country="at" data-size="big">
+            <td>Vienna</td>
+            <td>AT</td>
+            <td>big</td>
+          </tr>
+          <!-- edge case: unknown size value -->
+          <tr class="city-row" data-country="de" data-size="medium">
+            <td>Leipzig</td>
+            <td>DE</td>
+            <td>medium (not in size select)</td>
+          </tr>
+          <!-- edge case: missing data-size -->
+          <tr class="city-row" data-country="at">
+            <td>Innsbruck</td>
+            <td>AT</td>
+            <td>(no data-size)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- SECTION 4: bindAll() + data-* configuration with multiple filters -->
+    <section class="products-section" data-filter-root>
+      <div class="section-header">
+        <h2>4. bindAll() + data-* configuration (multiple filters)</h2>
+        <span class="small">
+          No explicit JS constructor, two filters configured via data attributes.
+        </span>
+      </div>
+
+      <div
+        class="product-filters filters-row"
+        data-filter-elements=".product-list .product-card"
+        data-filter-status=".product-filter-status"
+        data-filter-no-results=".product-no-results"
+        data-filter-all-value="all"
+      >
+        <label>
+          Category
+          <select name="category">
+            <option value="all">All categories</option>
+            <option value="gear">Gear</option>
+            <option value="book">Book</option>
+            <option value="service">Service (no hits)</option>
+          </select>
+        </label>
+        <label>
+          Availability
+          <select name="availability">
+            <option value="all">All</option>
+            <option value="in-stock">In stock</option>
+            <option value="out-of-stock">Out of stock</option>
+          </select>
+        </label>
+      </div>
+
+      <p class="product-filter-status status"></p>
+      <p class="product-no-results no-results-message" hidden>
+        No products found.
+      </p>
+
+      <div class="product-list cards-grid">
+        <article
+          class="product-card"
+          data-category="gear"
+          data-availability="in-stock"
+        >
+          <h3>Foraging basket</h3>
+          <p>Category: gear · Availability: in stock</p>
+        </article>
+        <article
+          class="product-card"
+          data-category="book"
+          data-availability="in-stock"
+        >
+          <h3>Mushroom field guide</h3>
+          <p>Category: book · Availability: in stock</p>
+        </article>
+        <article
+          class="product-card"
+          data-category="gear"
+          data-availability="out-of-stock"
+        >
+          <h3>Knife set</h3>
+          <p>Category: gear · Availability: out of stock</p>
+        </article>
+        <!-- edge case: missing one attribute -->
+        <article class="product-card" data-category="gear">
+          <h3>Simple basket (no availability)</h3>
+          <p>Category: gear · no data-availability.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- SECTION 5: Hooks demo (onBeforeFilter, onAfterFilter) + dynamic content -->
+    <section class="hooks-demo" data-filter-root>
+      <div class="section-header">
+        <h2>5. Hooks + dynamic content</h2>
+        <span class="small">
+          Uses <code>onBeforeFilter</code>, <code>onAfterFilter</code> and
+          <code>refreshElements()</code> after adding cards.
+        </span>
+      </div>
+
+      <div class="filters-row">
+        <label>
+          Habitat
+          <select name="habitat">
+            <option value="all">All habitats</option>
+            <option value="forest">Forest</option>
+            <option value="meadow">Meadow</option>
+          </select>
+        </label>
+        <button type="button" class="hooks-load-more">
+          Load more cards
+        </button>
+      </div>
+
+      <p class="hooks-status status"></p>
+      <p class="hooks-no-results no-results-message" hidden>
+        No cards in this habitat.
+      </p>
+
+      <div class="cards-grid hooks-card-list">
+        <article class="card" data-habitat="forest">
+          <h3>Old oak forest</h3>
+          <p>Habitat: forest</p>
+        </article>
+        <article class="card" data-habitat="meadow">
+          <h3>Flower meadow</h3>
+          <p>Habitat: meadow</p>
+        </article>
+        <!-- edge case: unknown habitat value -->
+        <article class="card" data-habitat="swamp">
+          <h3>Foggy swamp</h3>
+          <p>Habitat: swamp (not in select, should only be filtered by other criteria).</p>
+        </article>
+      </div>
+
+      <div class="hook-log" aria-label="Hook log (for demo)">
+        <!-- log lines get appended here -->
+      </div>
+    </section>
+
+    <!-- SECTION 6: Minimal configuration (no status, no no-results) -->
+    <section class="minimal-demo" data-filter-root>
+      <div class="section-header">
+        <h2>6. Minimal setup (no status/no-results elements)</h2>
+        <span class="small">
+          Only required options: <code>elementsSelector</code> and
+          <code>filtersSelector</code>.
+        </span>
+      </div>
+
+      <div class="filters-row">
+        <label>
+          Type
+          <select name="type">
+            <option value="all">All</option>
+            <option value="info">Info</option>
+            <option value="warning">Warning</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="cards-grid">
+        <article class="card" data-type="info">
+          <h3>Info box</h3>
+          <p>Type: info</p>
+        </article>
+        <article class="card" data-type="warning">
+          <h3>Warning box</h3>
+          <p>Type: warning</p>
+        </article>
+        <article class="card" data-type="info">
+          <h3>Another info box</h3>
+          <p>Type: info, no status and no explicit no-results element.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- GenericElementFilter from repo -->
+    <script src="genericelementfilter.js"></script>
+
+    <!-- Demo wiring -->
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // 1) Mushroom cards (explicit root, equals mode, reset)
+        const mushroomFilter = new GenericElementFilter(
+          ".mushroom-guide .card",
+          {
+            root: document.querySelector(".mushroom-guide"),
+            filtersSelector: ".mushroom-filters [name]",
+            statusSelector: ".filter-status",
+            noResultsSelector: ".no-results-message",
+            allValue: "all",
+            statusFormatter: (count) =>
+              count === 1 ? "1 mushroom visible" : `${count} mushrooms visible`,
+          }
+        );
+
+        document
+          .querySelector(".mushroom-guide .filters-reset")
+          ?.addEventListener("click", () => mushroomFilter.reset());
+
+        // 2) Tag cards (matchMode = "contains", auto-inferred root)
+        new GenericElementFilter(".tag-filter .card", {
+          filtersSelector: "select[name]",
+          statusSelector: ".tag-status",
+          noResultsSelector: ".tag-no-results",
+          allValue: "all",
+          matchMode: "contains",
+          statusFormatter: (count) =>
+            count === 1 ? "1 card visible" : `${count} cards visible`,
+        });
+
+        // 3) City table rows (allValue = "")
+        new GenericElementFilter(".city-table .city-row", {
+          root: document.querySelector(".city-table"),
+          filtersSelector: "select[name]",
+          statusSelector: ".city-status",
+          noResultsSelector: ".city-no-results",
+          allValue: "",
+          statusFormatter: (count) =>
+            count === 1 ? "1 city visible" : `${count} cities visible`,
+        });
+
+        // 4) Products via bindAll() (multiple filters)
+        GenericElementFilter.bindAll();
+
+        // 5) Hooks + dynamic content
+        const hooksRoot = document.querySelector(".hooks-demo");
+        const hookLog = hooksRoot.querySelector(".hook-log");
+
+        function log(message) {
+          const line = document.createElement("div");
+          const now = new Date();
+          const time = now.toLocaleTimeString();
+          line.textContent = `[${time}] ${message}`;
+          hookLog.appendChild(line);
+          hookLog.scrollTop = hookLog.scrollHeight;
+        }
+
+        const hooksFilter = new GenericElementFilter(".hooks-card-list .card", {
+          root: hooksRoot,
+          filtersSelector: "select[name]",
+          statusSelector: ".hooks-status",
+          noResultsSelector: ".hooks-no-results",
+          allValue: "all",
+          statusFormatter: (count) =>
+            count === 1 ? "1 card visible" : `${count} cards visible`,
+          onBeforeFilter: ({ currentFilters }) => {
+            log(
+              `Before filter: habitat = ${currentFilters.habitat || "(n/a)"}`
+            );
+          },
+          onAfterFilter: ({ currentFilters, visibleCount, totalCount }) => {
+            log(
+              `After filter: habitat = ${
+                currentFilters.habitat || "(n/a)"
+              }, visible ${visibleCount}/${totalCount}`
+            );
+          },
+        });
+
+        hooksRoot
+          .querySelector(".hooks-load-more")
+          .addEventListener("click", () => {
+            const container = hooksRoot.querySelector(".hooks-card-list");
+            container.insertAdjacentHTML(
+              "beforeend",
+              `
+              <article class="card" data-habitat="forest">
+                <h3>New forest patch</h3>
+                <p>Habitat: forest (dynamically added)</p>
+              </article>
+            `
+            );
+
+            hooksFilter.refreshElements();
+            log("Added one more forest card and refreshed elements.");
+          });
+
+        // 6) Minimal config (no status/no-results)
+        new GenericElementFilter(".minimal-demo .card", {
+          root: document.querySelector(".minimal-demo"),
+          filtersSelector: "select[name]",
+          allValue: "all",
+        });
+      });
+    </script>
+  </body>
+</html>
