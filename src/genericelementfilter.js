@@ -55,7 +55,7 @@ class GenericElementFilter {
 
     // Root: either explicitly provided or inferred from the elementsSelector.
     // Root is used for locating filters, status, no-results, but NOT for the
-    // elementsSelector lookup anymore.
+    // elementsSelector lookup.
     this.root = root || GenericElementFilter._inferRoot(elementsSelector);
 
     // Store configuration
@@ -112,9 +112,7 @@ class GenericElementFilter {
     // Use document.querySelectorAll here so that selectors like
     // ".tag-filter .card" or ".mushroom-guide .card" work correctly
     // even when a narrower root is used or inferred.
-    this.elements = Array.from(
-      document.querySelectorAll(elementsSelector)
-    );
+    this.elements = Array.from(document.querySelectorAll(elementsSelector));
 
     // Set a viewTransitionName per element to allow smooth transitions
     this.elements.forEach((element, index) => {
@@ -417,6 +415,9 @@ class GenericElementFilter {
   /**
    * Infer a reasonable root element from the elementsSelector.
    * Used only when no explicit root is provided.
+   *
+   * Important: avoid using the element itself as root (especially
+   * when the selector points to leaf nodes like ".tag-filter .card").
    */
   static _inferRoot(elementsSelector) {
     if (!elementsSelector || typeof elementsSelector !== "string") {
@@ -427,11 +428,16 @@ class GenericElementFilter {
     const first = elements[0];
     if (!first) return document;
 
-    // Prefer a semantic or explicit container if available
-    const container =
-      first.closest("[data-filter-root], section, article, main") ||
-      first.parentElement ||
-      document;
+    // 1) Prefer an explicit data-filter-root ancestor if present
+    const explicitContainer = first.closest("[data-filter-root]");
+    if (explicitContainer) return explicitContainer;
+
+    // 2) Otherwise prefer semantic containers (but avoid the element itself)
+    let container = first.closest("section, main, body");
+
+    if (!container || container === first) {
+      container = first.parentElement || document;
+    }
 
     return container;
   }
