@@ -6,7 +6,8 @@ A small, framework-agnostic helper to filter any kind of elements (cards, table 
 * Works with any HTML structure (not table-specific)
 * Optional View Transitions support
 * A11y-friendly (live status and “no results” messaging)
-* Can be configured via JS **or** via `data-*` + `bindAll()`
+* Configurable via JS **or** via `data-*` + `bindAll()`
+* Optional **`matchMode: "contains"`**, **`reset()` helper** and **hooks**
 
 ---
 
@@ -61,7 +62,7 @@ Each filterable element needs matching `data-*` attributes.
 
 ```js
 document.addEventListener("DOMContentLoaded", () => {
-  new GenericElementFilter(".mushroom-guide .card", {
+  const filter = new GenericElementFilter(".mushroom-guide .card", {
     root: document.querySelector(".mushroom-guide"),
     filtersSelector: ".mushroom-filters [name]",
     statusSelector: ".filter-status",
@@ -70,6 +71,11 @@ document.addEventListener("DOMContentLoaded", () => {
     statusFormatter: (count) =>
       count === 1 ? "1 mushroom visible" : `${count} mushrooms visible`,
   });
+
+  // Optional: wire a reset button
+  document
+    .querySelector(".filter-reset")
+    ?.addEventListener("click", () => filter.reset());
 });
 ```
 
@@ -180,13 +186,15 @@ const filter = new GenericElementFilter(".mushroom-guide .card", {
   filtersSelector: ".mushroom-filters [name]",
 });
 
-// later: load more items
-function loadMore() {
+async function loadMore() {
   const container = document.querySelector(".mushroom-guide .card-list");
+
   container.insertAdjacentHTML(
     "beforeend",
     `
-      <article class="card" data-season="autumn" data-edible="yes">New item</article>
+      <article class="card" data-season="autumn" data-edible="yes">
+        New item
+      </article>
     `
   );
 
@@ -196,7 +204,128 @@ function loadMore() {
 
 ---
 
-## 6. Options overview
+## 6. Multi-value / `matchMode: "contains"`
+
+You can switch the matching logic from strict equality to a simple **token-based `contains` mode**.
+
+* In `"equals"` mode (default):
+  `data-tags="forest meadow"` only matches `value="forest"` if the entire string equals `"forest"`.
+* In `"contains"` mode:
+  `data-tags="forest meadow"` matches if one of the tokens equals the filter value.
+
+Tokens are derived from:
+
+* comma-separated: `data-tags="forest, meadow"`, or
+* whitespace-separated: `data-tags="forest meadow"`
+
+### Example
+
+```html
+<select name="tag">
+  <option value="all">All tags</option>
+  <option value="forest">Forest</option>
+  <option value="meadow">Meadow</option>
+</select>
+
+<article class="card" data-tag="forest meadow">…</article>
+<article class="card" data-tag="meadow">…</article>
+<article class="card" data-tag="water">…</article>
+```
+
+```js
+document.addEventListener("DOMContentLoaded", () => {
+  new GenericElementFilter(".card", {
+    root: document.querySelector(".tag-filter"),
+    filtersSelector: "select[name]",
+    allValue: "all",
+    matchMode: "contains", // <- enables token-based matching on data-*
+  });
+});
+```
+
+In this setup:
+
+* selecting `"forest"` shows all elements whose `data-tag` contains the token `forest`
+* selecting `"all"` shows everything.
+
+---
+
+## 7. Reset helper (`reset()`)
+
+`reset()`:
+
+* resets all filter controls to `allValue` if possible (or to their first option),
+* updates `currentFilters`,
+* and re-applies filtering.
+
+Typical wiring:
+
+```html
+<button type="button" class="filters-reset">Reset filters</button>
+```
+
+```js
+document.addEventListener("DOMContentLoaded", () => {
+  const filter = new GenericElementFilter(".mushroom-guide .card", {
+    root: document.querySelector(".mushroom-guide"),
+    filtersSelector: ".mushroom-filters [name]",
+    allValue: "all",
+  });
+
+  document
+    .querySelector(".filters-reset")
+    ?.addEventListener("click", () => filter.reset());
+});
+```
+
+Basic handling:
+
+* For `<select>` elements:
+
+  * prefer an option with `value === allValue` (if present),
+  * otherwise select the first option.
+* For inputs:
+
+  * checkboxes/radios → unchecked, logical filter value set to `allValue`.
+  * text inputs → cleared, logical filter value set to `allValue`.
+
+---
+
+## 8. Hooks (`onBeforeFilter`, `onAfterFilter`)
+
+You can plug into the filtering lifecycle:
+
+```js
+new GenericElementFilter(".mushroom-guide .card", {
+  root: document.querySelector(".mushroom-guide"),
+  filtersSelector: ".mushroom-filters [name]",
+  onBeforeFilter: ({ currentFilters, elements }) => {
+    console.debug("About to filter with:", currentFilters, elements.length);
+  },
+  onAfterFilter: ({ currentFilters, visibleCount, totalCount, elements }) => {
+    console.debug(
+      "Filter result:",
+      currentFilters,
+      `visible: ${visibleCount}/${totalCount}`
+    );
+  },
+});
+```
+
+Both hooks receive **copies** of the current state and the elements array, so you don’t accidentally mutate internal state.
+
+* `onBeforeFilter({ currentFilters, elements })`
+* `onAfterFilter({ currentFilters, visibleCount, totalCount, elements })`
+
+Typical use-cases:
+
+* Logging / debugging
+* Analytics
+* Custom UI updates outside the basic “status + no results” messaging
+
+---
+
+## 9. Options overview
 
 ```ts
 new GenericElementFilter(elementsSelector: string, options?: {
@@ -207,12 +336,16 @@ new GenericElementFilter(elementsSelector: string, options?: {
   allValue?: string;                         // default: "all"
   viewTransitionPrefix?: string;             // default: derived from elementsSelector
   statusFormatter?: (count: number) => string;
+  matchMode?: "equals" | "contains";         // default: "equals"
+  onBeforeFilter?: (ctx: {
+    currentFilters: Record<string, string>;
+    elements: Element[];
+  }) => void;
+  onAfterFilter?: (ctx: {
+    currentFilters: Record<string, string>;
+    visibleCount: number;
+    totalCount: number;
+    elements: Element[];
+  }) => void;
 });
 ```
-
-* `elementsSelector` **(required)** – selector for elements to filter (cards, rows, etc.)
-* `root` – query scope & logical “area” of the filter; if omitted, it’s auto-inferred.
-* `filtersSelector` – which controls act as filters (usually something like `.filters [name]`).
-* `noResultsSelector` – element shown when no matches are visible; is treated as a polite live region.
-* `statusSelector` – optional status line (e.g. “7 results”) – also a live region and linked via `aria-describedby`.
-* `allValue` – value used for “show all” options; comparisons are skipped for that filter.
