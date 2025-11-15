@@ -1,4 +1,4 @@
-// main.js
+// GenericElementFilter.js
 
 class GenericElementFilter {
   /**
@@ -14,8 +14,8 @@ class GenericElementFilter {
    * data-* configuration on a container element.
    *
    * @param {string} elementsSelector - CSS selector for elements to filter (required)
-   * @param {object} options - Configuration options (all optional)
-   *   @param {Element|Document} [options.root] - Root element to scope all queries.
+   * @param {object} [options] - Configuration options (all optional)
+   *   @param {Element|Document} [options.root] - Root element to scope filters/status.
    *        If omitted, a root is inferred from elementsSelector.
    *   @param {string} [options.filtersSelector="select[name]"] - Selector for filter controls
    *   @param {string} [options.noResultsSelector=".no-results-message"] - Selector for "no results" message
@@ -53,7 +53,9 @@ class GenericElementFilter {
     // Inject minimal base CSS for [hidden] once per page
     GenericElementFilter._ensureBaseStyles();
 
-    // Root: either explicitly provided or inferred from the elementsSelector
+    // Root: either explicitly provided or inferred from the elementsSelector.
+    // Root is used for locating filters, status, no-results, but NOT for the
+    // elementsSelector lookup anymore.
     this.root = root || GenericElementFilter._inferRoot(elementsSelector);
 
     // Store configuration
@@ -83,10 +85,9 @@ class GenericElementFilter {
       typeof onAfterFilter === "function" ? onAfterFilter : null;
 
     // Holds the currently active filter values, keyed by filter name
-    // Example: { season: "all", edible: "all" }
     this.currentFilters = {};
 
-    // Initialization steps split into helpers for readability
+    // Initialization steps
     this._initializeElements(this.elementsSelector);
     this._initializeFilters();
     this._initializeAria();
@@ -107,9 +108,12 @@ class GenericElementFilter {
    * Can be called again (via refreshElements) when new elements are added.
    */
   _initializeElements(elementsSelector) {
-    // Elements that will be shown/hidden when filtering
+    // IMPORTANT:
+    // Use document.querySelectorAll here so that selectors like
+    // ".tag-filter .card" or ".mushroom-guide .card" work correctly
+    // even when a narrower root is used or inferred.
     this.elements = Array.from(
-      this.root.querySelectorAll(elementsSelector)
+      document.querySelectorAll(elementsSelector)
     );
 
     // Set a viewTransitionName per element to allow smooth transitions
@@ -119,7 +123,7 @@ class GenericElementFilter {
         `${this.viewTransitionPrefix}-${elementId}`;
     });
 
-    // Optional "no results" message element
+    // Optional "no results" message element (scoped to root)
     this.noResultsMessage = this.root.querySelector(this.noResultsSelector);
 
     // Optional status element that shows a count like "7 results found"
@@ -143,16 +147,8 @@ class GenericElementFilter {
 
     this.filters.forEach((filter) => {
       const filterName = filter.name;
-
-      // Initial value:
-      // Use the current form control value as-is if present;
-      // fallback to allValue only if it's null/undefined.
-      //
-      // This keeps behavior identical to an initial state like
-      // { season: "all", edible: "all" } as long as the HTML
-      // uses value="all" as default (or allValue accordingly).
-      this.currentFilters[filterName] =
-        filter.value ?? this.allValue;
+      // Initial value: use current control value if present, fallback to allValue.
+      this.currentFilters[filterName] = filter.value ?? this.allValue;
 
       filter.addEventListener("change", (event) => this.updateFilter(event));
     });
@@ -164,7 +160,6 @@ class GenericElementFilter {
 
   /**
    * Initialize ARIA attributes on dynamic status elements.
-   * Keeps ARIA usage minimal and focused.
    *
    * - noResultsMessage and statusElement are Live-Regions (role="status", aria-live="polite")
    * - statusElement is referenced via aria-describedby from filter controls (if present)
@@ -378,7 +373,6 @@ class GenericElementFilter {
 
         this.currentFilters[name] = filter.value ?? this.allValue;
       } else if (filter instanceof HTMLInputElement) {
-        // Basic support for text inputs or checkboxes/radios:
         if (filter.type === "checkbox" || filter.type === "radio") {
           // Clear selection; treat "no selection" as "all" logically.
           filter.checked = false;
@@ -502,7 +496,7 @@ class GenericElementFilter {
         {
           // Scope root to a nearby structural container if possible
           root: container.closest("section, main, body") || root,
-          // By default: all controls with a name inside this container
+          // By default: all controls with a name inside this container's root
           filtersSelector: "[name]",
           statusSelector,
           noResultsSelector,
