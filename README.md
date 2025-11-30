@@ -10,6 +10,8 @@ A small, framework-agnostic helper to filter any kind of elements (cards, table 
 * Configurable via JS **or** via `data-*` + `bindAll()`
 * Optional **`matchMode: "contains"`**, **`reset()` helper** and **hooks**
 
+Read more about it (in German) in my [blog](https://www.ulrischa.de/elemente-auf-einer-webseite-filtern-mit-genericelementfilter/)
+
 ---
 
 ## 1. Basic concept
@@ -328,7 +330,7 @@ Typical use-cases:
 
 ## 9. Options overview
 
-```ts
+```js
 new GenericElementFilter(elementsSelector: string, options?: {
   root?: Element | Document;                 // default: inferred from elementsSelector
   filtersSelector?: string;                  // default: "select[name]"
